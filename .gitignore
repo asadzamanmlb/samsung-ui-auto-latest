@@ -1,0 +1,26 @@
+# Don't check auto-generated stuff into git
+dist
+build
+.DS_Store
+sessions
+generated
+logs
+e2e-test/logs/
+e2e-test/transpiled
+e2e-test/generatedFeatures
+e2e-test/generated
+static-scan
+allure-report
+reports/
+gitignored/
+qemu_chrome*.core
+core
+terminal_commands_notes.sh
+/allure-results
+/report
+terminal.txt
+/temp
+node_modules/
+okta-token.json
+appium.log
+appium.log
