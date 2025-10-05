@@ -88,31 +88,67 @@ When(/^I click Have Mlb account$/, async () => {
   const haveMlbAccountBtn = await onboardingPageObject["Have Mlb Account"]();
   await haveMlbAccountBtn.waitForExist({ timeout: 30000 });
 
-  console.log("🎯 Using clickElement to focus the button");
-  await clickElement({ objectKey: haveMlbAccountBtn });
-
-  console.log(
-    "✅ Button focused! Now using Tizen remote Enter key to activate..."
-  );
-  await browser.pause(1000); // Wait for focus to settle
-
-  // Use proper Tizen remote keys for TV navigation
+  console.log("🎯 Navigating to 'Have An MLB.TV Account?' button using arrow keys");
+  
+  // Method 1: Navigate using DOWN arrow key from Get Started button
   try {
-    console.log("📺 Sending Enter key via Tizen remote to activate button...");
+    console.log("📺 Pressing DOWN arrow to navigate to second button...");
+    await browser.execute("tizen: pressKey", { key: Keys.DOWN });
+    await browser.pause(1000);
+    
+    console.log("📺 Pressing ENTER to activate the button...");
     await browser.execute("tizen: pressKey", { key: Keys.ENTER });
-    console.log("✅ Enter key sent successfully - button should be activated!");
-
-    await browser.pause(3000); // Wait longer for navigation to complete
+    await browser.pause(2000);
+    
+    console.log("✅ Navigation attempt 1 completed");
   } catch (e) {
-    console.log(
-      "⚠️ Tizen remote key failed, using direct click fallback:",
-      e.message
-    );
-    await haveMlbAccountBtn.click();
-    await browser.pause(3000);
+    console.log("⚠️ Arrow key navigation failed:", e.message);
   }
 
-  console.log("⏳ Waiting for navigation...");
+  // Method 2: Check if we're still on the same screen, try direct click + Enter
+  const pageSource = await browser.getPageSource();
+  if (pageSource.includes('getStartedScreen')) {
+    console.log("⚠️ Still on onboarding screen, trying direct element interaction...");
+    
+    try {
+      // Focus the element
+      await haveMlbAccountBtn.click();
+      await browser.pause(1000);
+      
+      // Send Enter key
+      await browser.execute("tizen: pressKey", { key: Keys.ENTER });
+      await browser.pause(2000);
+      
+      console.log("✅ Direct click + Enter completed");
+    } catch (e) {
+      console.log("⚠️ Direct interaction failed:", e.message);
+    }
+  }
+
+  // Method 3: Try JavaScript click event
+  if (pageSource.includes('getStartedScreen')) {
+    console.log("⚠️ Still on onboarding screen, trying JavaScript click...");
+    
+    try {
+      await browser.execute((selector) => {
+        const element = document.querySelector(selector);
+        if (element) {
+          element.click();
+          // Trigger multiple event types
+          element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+          element.dispatchEvent(new Event('select', { bubbles: true }));
+          element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        }
+      }, "[data-testid='haveMlbAccountButton']");
+      
+      await browser.pause(3000);
+      console.log("✅ JavaScript click completed");
+    } catch (e) {
+      console.log("⚠️ JavaScript click failed:", e.message);
+    }
+  }
+
+  console.log("⏳ Waiting for navigation to complete...");
   await browser.pause(5000);
   console.log("✅ Button activation sequence completed!");
 });

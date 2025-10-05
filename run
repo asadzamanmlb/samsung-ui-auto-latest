@@ -5,6 +5,39 @@
 
 set -e  # Exit on any error
 
+# Setup Node.js version using nvm
+setup_node_version() {
+    # Load nvm if available
+    export NVM_DIR="$HOME/.nvm"
+    if [ -s "$NVM_DIR/nvm.sh" ]; then
+        source "$NVM_DIR/nvm.sh"
+        
+        # Use Node.js 22.11.0 (required for this project)
+        if nvm use 22.11.0 >/dev/null 2>&1; then
+            log_info "Using Node.js $(node --version)"
+        else
+            log_warning "Node.js 22.11.0 not found, installing..."
+            nvm install 22.11.0
+            nvm use 22.11.0
+            log_success "Node.js 22.11.0 installed and activated"
+        fi
+    else
+        # Check if node is available and meets minimum version
+        if command -v node >/dev/null 2>&1; then
+            local node_version=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
+            if [ "$node_version" -lt 18 ]; then
+                log_error "Node.js version 18+ required, but found $(node --version)"
+                log_info "Please install Node.js 22.11.0 or higher"
+                exit 1
+            fi
+            log_info "Using Node.js $(node --version)"
+        else
+            log_error "Node.js not found. Please install Node.js 22.11.0 or higher"
+            exit 1
+        fi
+    fi
+}
+
 # Configuration - These can be overridden by environment variables
 TV_IP="${SAMSUNG_TV_IP:-}"  # Will be auto-discovered if not set
 TV_PORT="${SAMSUNG_TV_PORT:-26101}"
@@ -468,10 +501,12 @@ get_test_file() {
     esac
 }
 
-# Run the test
+# Run the test with retry logic
 run_test() {
     local test_spec="$1"
     local test_file=$(get_test_file "$test_spec")
+    local max_retries=3
+    local retry_count=0
     
     if [ ! -f "$test_file" ]; then
         log_error "Test file not found: $test_file"
@@ -493,14 +528,36 @@ run_test() {
     setup_environment
     
     log_info "Running test: $test_file"
+    log_info "Max retries: $max_retries"
     
-    # Run the WebDriverIO test
-    if npm run wdio -- --spec="$test_file"; then
-        log_success "Test completed successfully!"
-    else
-        log_error "Test failed!"
-        exit 1
-    fi
+    # Run the WebDriverIO test with retry logic
+    while [ $retry_count -lt $max_retries ]; do
+        retry_count=$((retry_count + 1))
+        
+        if [ $retry_count -eq 1 ]; then
+            log_info "🚀 Test attempt $retry_count of $max_retries"
+        else
+            log_warning "🔄 Retry attempt $retry_count of $max_retries"
+            log_info "Performing connection recovery before retry..."
+            perform_connection_recovery "quick" > /dev/null 2>&1 || true
+            sleep 3
+        fi
+        
+        if npm run wdio -- --spec="$test_file"; then
+            log_success "✅ Test completed successfully on attempt $retry_count!"
+            return 0
+        else
+            if [ $retry_count -lt $max_retries ]; then
+                log_warning "❌ Test failed on attempt $retry_count, will retry..."
+                sleep 5
+            else
+                log_error "❌ Test failed after $max_retries attempts!"
+                return 1
+            fi
+        fi
+    done
+    
+    exit 1
 }
 
 # Cleanup function
@@ -536,6 +593,9 @@ main() {
     local command="$1"
     local test_spec="$2"
     
+    # Setup Node.js version first (before logging functions are used)
+    # We need to do this early but after the script starts
+    
     # Load configuration file early for all commands
     load_config
     
@@ -550,6 +610,9 @@ main() {
             
             log_info "🚀 Starting Samsung TV Test Runner..."
             log_info "================================================"
+            
+            # Setup Node.js version
+            setup_node_version
             
             # Auto-discover TV if not manually configured
             if [ -z "$TV_IP" ]; then

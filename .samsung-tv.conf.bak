@@ -4,9 +4,9 @@
 
 TV_IP="172.30.228.237"
 TV_PORT="26101"
-RC_TOKEN="14813311"
+RC_TOKEN="58997311"
 APPIUM_PORT="4723"
-SDB_PATH="/Users/jenkins/tizen-studio/tools/sdb"
+SDB_PATH="/Users/asad.zaman/tizen-studio/tools/sdb"
 APP_PACKAGE="gGnYSxMq0A.MLBTVSTG"
 
 # Auto-discovery settings
