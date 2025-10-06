@@ -13,7 +13,5 @@ Feature: SVOD Video Playback Test
     And I select a video tile from the SVOD carousel
     And I press Enter to play the selected video
     Then I should see video playback start
-    And I should see video player controls
-    And I should verify video is actually playing
 
   

@@ -758,14 +758,14 @@ When("I select a video tile from the SVOD carousel", async function () {
   console.log("🎯 Selecting video tile from SVOD carousel...");
 
   try {
-    // Look for video tiles within the carousel or on the page
+    // Look for video tiles using multiple strategies
     const tileSelectors = [
+      "//h2/following-sibling::div//ul[@role='list']//img[1]", // First image in carousel
+      "//section//ul[@role='list']//li[1]//img", // First list item image
+      "//section//ul[@role='list']//li[1]//button", // First list item button
       "[data-testid*='tile']",
       "[data-testid*='card']",
-      "[data-testid*='item']",
-      ".video-tile",
-      ".content-tile",
-      ".carousel-item",
+      "//ul[@role='list']//li[1]", // First list item
       "button[aria-label*='play']",
       "button[aria-label*='video']",
     ];
@@ -780,14 +780,18 @@ When("I select a video tile from the SVOD carousel", async function () {
           console.log(
             `✅ Found ${tiles.length} tile(s) with selector: ${selector}`
           );
-          // Select the first visible and clickable tile
+          // Select the first visible tile
           for (const tile of tiles) {
-            const isDisplayed = await tile.isDisplayed();
-            const isClickable = await tile.isClickable();
-            if (isDisplayed && isClickable) {
-              selectedTile = tile;
-              tileFound = true;
-              break;
+            try {
+              const isDisplayed = await tile.isDisplayed();
+              if (isDisplayed) {
+                selectedTile = tile;
+                tileFound = true;
+                console.log(`✅ Selected tile is displayed`);
+                break;
+              }
+            } catch (e) {
+              console.log(`⚠️ Could not check tile visibility: ${e.message}`);
             }
           }
           if (tileFound) break;
@@ -800,7 +804,7 @@ When("I select a video tile from the SVOD carousel", async function () {
     if (tileFound && selectedTile) {
       console.log("🎯 Using clickElement to focus on video tile...");
       await clickElement({ objectKey: selectedTile });
-      await browser.pause(2000);
+      await browser.pause(3000);
 
       console.log("✅ Video tile selected successfully");
       this.selectedVideoTile = selectedTile;

@@ -7,12 +7,25 @@
     "@wdio/cli": "latest",
     "@wdio/cucumber-framework": "^9.18.0",
     "@wdio/local-runner": "^9.18.4",
+    "@wdio/spec-reporter": "^9.20.0",
     "@wdio/visual-service": "^9.0.0",
     "appium": "^2.0.0",
-    "appium-tizen-tv-driver": "^0.18.1"
+    "appium-tizen-tv-driver": "^0.18.1",
+    "cucumber-html-reporter": "^7.2.0",
+    "playwright": "^1.55.1",
+    "rimraf": "^6.0.1",
+    "wdio-cucumberjs-json-reporter": "^6.0.1",
+    "wdio-html-nice-reporter": "^8.1.7"
   },
   "scripts": {
-    "wdio": "wdio run ./wdio.conf.js"
+    "wdio": "wdio run ./wdio.conf.js",
+    "test": "wdio run ./wdio.conf.js",
+    "test:report": "wdio run ./wdio.conf.js && open reports/timeline-html/index.html",
+    "report:cleanup": "node reportCleanUp.js",
+    "report:html": "node modifyHtml.cjs",
+    "report:pdf": "node make-playwrightpdf/make-playwrightpdf.js",
+    "report:view": "open reports/timeline-html/index.html",
+    "report:view-pdf": "open reports/timeline-html/report.pdf"
   },
   "dependencies": {
     "@humanwhocodes/env": "^4.0.1",

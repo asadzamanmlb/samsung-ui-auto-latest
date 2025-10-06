@@ -560,14 +560,23 @@ run_test() {
     exit 1
 }
 
+# Global flag to track if cleanup is needed
+CLEANUP_NEEDED=false
+
 # Cleanup function
 cleanup() {
+    # Only run cleanup if it's actually needed (e.g., after test runs)
+    if [ "$CLEANUP_NEEDED" = false ]; then
+        return 0
+    fi
+    
     log_info "Cleaning up..."
     
     # Use the advanced recovery script for cleanup if available
     if [ -f "./reset-connection.sh" ]; then
         log_info "Using advanced cleanup with reset-connection.sh..."
-        ./reset-connection.sh --quick > /dev/null 2>&1 || true
+        # Run cleanup with timeout to prevent hanging
+        timeout 10 ./reset-connection.sh --quick > /dev/null 2>&1 || true
     else
         # Fallback to basic cleanup
         log_info "Using basic cleanup..."
@@ -579,7 +588,7 @@ cleanup() {
         # Reset SDB connection if it seems stuck
         if [ -f "$SDB_PATH" ]; then
             log_info "Resetting SDB connection during cleanup..."
-            reset_sdb_connection > /dev/null 2>&1 || true
+            timeout 5 bash -c "reset_sdb_connection" > /dev/null 2>&1 || true
         fi
     fi
     
@@ -607,6 +616,9 @@ main() {
                 log_info "Example: ./run test @loginTest"
                 exit 1
             fi
+            
+            # Enable cleanup for test runs
+            CLEANUP_NEEDED=true
             
             log_info "🚀 Starting Samsung TV Test Runner..."
             log_info "================================================"
@@ -784,3 +796,6 @@ trap cleanup EXIT
 
 # Execute main function with all arguments
 main "$@"
+
+# Explicitly exit with the last command's exit code
+exit $?
