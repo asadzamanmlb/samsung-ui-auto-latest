@@ -82,9 +82,10 @@ export const config = {
   //
   // Spec File Retries
   // ===================
-  specFileRetries: 3,
-  specFileRetriesDelay: 10,
-  specFileRetriesDeferred: true,
+  // Disabled by default - use RETRY=Y with ./run script to enable retries
+  specFileRetries: 0,
+  specFileRetriesDelay: 0,
+  specFileRetriesDeferred: false,
 
   //
   // Services
