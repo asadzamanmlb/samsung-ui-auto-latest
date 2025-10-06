@@ -1,9 +1,13 @@
 #!/bin/bash
 
 # Samsung TV Test Runner Script
-# Usage: ./run test "@loginTest" or ./run test "features/validLogin.feature"
+# Usage: ./run test "@loginTest" or RETRY=Y ./run test "features/validLogin.feature"
+# Set RETRY=Y to enable automatic retries on failure (default: no retries)
 
 set -e  # Exit on any error
+
+# Check if retry is enabled via environment variable
+RETRY_ENABLED="${RETRY:-N}"
 
 # Setup Node.js version using nvm
 setup_node_version() {
@@ -505,7 +509,16 @@ get_test_file() {
 run_test() {
     local test_spec="$1"
     local test_file=$(get_test_file "$test_spec")
-    local max_retries=3
+    
+    # Set max retries based on RETRY flag
+    local max_retries=1
+    if [ "$RETRY_ENABLED" = "Y" ] || [ "$RETRY_ENABLED" = "y" ] || [ "$RETRY_ENABLED" = "yes" ]; then
+        max_retries=3
+        log_info "Retry mode enabled: Tests will retry up to 3 times on failure"
+    else
+        log_info "Retry mode disabled: Tests will run once (set RETRY=Y to enable retries)"
+    fi
+    
     local retry_count=0
     
     if [ ! -f "$test_file" ]; then
@@ -528,14 +541,17 @@ run_test() {
     setup_environment
     
     log_info "Running test: $test_file"
-    log_info "Max retries: $max_retries"
     
     # Run the WebDriverIO test with retry logic
     while [ $retry_count -lt $max_retries ]; do
         retry_count=$((retry_count + 1))
         
         if [ $retry_count -eq 1 ]; then
-            log_info "🚀 Test attempt $retry_count of $max_retries"
+            if [ $max_retries -eq 1 ]; then
+                log_info "🚀 Running test..."
+            else
+                log_info "🚀 Test attempt $retry_count of $max_retries"
+            fi
         else
             log_warning "🔄 Retry attempt $retry_count of $max_retries"
             log_info "Performing connection recovery before retry..."
@@ -544,14 +560,22 @@ run_test() {
         fi
         
         if npm run wdio -- --spec="$test_file"; then
-            log_success "✅ Test completed successfully on attempt $retry_count!"
+            if [ $max_retries -eq 1 ]; then
+                log_success "✅ Test completed successfully!"
+            else
+                log_success "✅ Test completed successfully on attempt $retry_count!"
+            fi
             return 0
         else
             if [ $retry_count -lt $max_retries ]; then
                 log_warning "❌ Test failed on attempt $retry_count, will retry..."
                 sleep 5
             else
-                log_error "❌ Test failed after $max_retries attempts!"
+                if [ $max_retries -eq 1 ]; then
+                    log_error "❌ Test failed!"
+                else
+                    log_error "❌ Test failed after $max_retries attempts!"
+                fi
                 return 1
             fi
         fi
@@ -642,6 +666,28 @@ main() {
                 log_info "Please set TV_IP in $CONFIG_FILE or use environment variable SAMSUNG_TV_IP"
                 exit 1
             fi
+            
+            # Pre-test cleanup
+            log_info "Performing pre-test cleanup..."
+            
+            # Kill the app if it's running
+            if [ -f "$SDB_PATH" ] && [ -n "$APP_PACKAGE" ]; then
+                log_info "Killing app: $APP_PACKAGE"
+                $SDB_PATH shell 0 was_kill $APP_PACKAGE > /dev/null 2>&1 || true
+                sleep 2
+            fi
+            
+            # Reset SDB connection
+            if [ -f "$SDB_PATH" ]; then
+                log_info "Resetting SDB connection..."
+                $SDB_PATH disconnect $TV_IP:$TV_PORT > /dev/null 2>&1 || true
+                $SDB_PATH kill-server > /dev/null 2>&1 || true
+                sleep 1
+                $SDB_PATH start-server > /dev/null 2>&1 || true
+                sleep 2
+            fi
+            
+            log_success "Pre-test cleanup completed"
             
             # Setup
             check_device_connection
