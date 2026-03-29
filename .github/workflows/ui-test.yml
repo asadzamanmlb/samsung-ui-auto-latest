@@ -1,0 +1,86 @@
+name: UI Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      samsung_tv_ip:
+        description: 'Samsung TV IP Address'
+        required: true
+        default: '192.168.4.31'
+      samsung_tv_port:
+        description: 'Samsung TV Port'
+        required: false
+        default: '26101'
+      samsung_app_package:
+        description: 'App Package ID'
+        required: false
+        default: 'gGnYSxMq0L.MLBTVSTG'
+      tag_expression:
+        description: 'Cucumber tag expression to filter tests (e.g. @loginTest). Leave empty to run all tests.'
+        required: false
+        default: ''
+      environment:
+        description: 'Test environment (STG or PRD)'
+        required: false
+        default: 'STG'
+
+jobs:
+  ui-test:
+    name: Run Samsung TV UI Tests
+    runs-on: self-hosted
+    timeout-minutes: 120
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Appium Tizen TV driver
+        run: |
+          if npx appium driver list --installed 2>/dev/null | grep -q 'tizentv'; then
+            echo "Appium Tizen TV driver is already installed."
+          else
+            npx appium driver install tizentv
+          fi
+
+      - name: Run UI tests
+        env:
+          SAMSUNG_TV_IP: ${{ inputs.samsung_tv_ip }}
+          SAMSUNG_TV_PORT: ${{ inputs.samsung_tv_port }}
+          SAMSUNG_APP_PACKAGE: ${{ inputs.samsung_app_package }}
+          TEST_APPIUM_TIZEN_RC_TOKEN: ${{ secrets.TEST_APPIUM_TIZEN_RC_TOKEN }}
+          TEST_APPIUM_TIZEN_CHROMEDRIVER: ${{ secrets.TEST_APPIUM_TIZEN_CHROMEDRIVER || format('{0}/chromedriver/chromedriver', github.workspace) }}
+          ENV: ${{ inputs.environment }}
+          TAG_EXPRESSION: ${{ inputs.tag_expression }}
+        run: |
+          # Validate tag expression: allow only @, alphanumeric, spaces, commas, parentheses, and logical operators
+          if [ -n "$TAG_EXPRESSION" ]; then
+            if ! echo "$TAG_EXPRESSION" | grep -qP '^[@\w\s,()andornot]+$'; then
+              echo "Error: tag_expression contains invalid characters." >&2
+              exit 1
+            fi
+            npx wdio run ./wdio.conf.js --cucumberOpts.tagExpression="$TAG_EXPRESSION"
+          else
+            npm test
+          fi
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-${{ github.run_number }}
+          path: |
+            reports/
+            terminal.txt
+          retention-days: 30
+          if-no-files-found: ignore
